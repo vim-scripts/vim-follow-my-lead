@@ -1,0 +1,17 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=5244
+
+For details visit:
+
+https://github.com/ktonga/vim-follow-my-lead
+
+Features:
+
+* List <Leader> mappings defined by the user and the plugins
+* By default only mappings defined in .vimrc are listed. It honours $MYVIMRC variable
+* Mappings from all scripts sourced by Vim can be listed if specified by configuration (see Options)
+* If the line previous to the mapping is a comment it will be used as the description
+* If no comment is available the rhs of the mapping is used as description
+* Mappings are shown in a table, grouped by source, with the following columns
+    * Mode: which mode the mapping applies to
+    * LHS: left hand side of the mapping (without <Leader>)
+    * Description: The mapping comment if present. The rhs otherwise
