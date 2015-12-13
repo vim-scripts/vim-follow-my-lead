@@ -10,9 +10,12 @@ let s:fml_escaped_leader = escape(s:fml_leader, '\')
 
 function! FMLGetLeaderMappingsBySource()
   let all_maps = ""
+  let old_lang = v:lang
+  lang message C
   redir => all_maps
   silent execute "verbose map"
   redir END
+  silent execute "lang message" old_lang
   let lines = split(all_maps, "\n")
   let linesLen = len(lines)
   let mappings_by_source = {}
@@ -30,8 +33,12 @@ function! FMLGetLeaderMappingsBySource()
     let idx = idx + 2
   endwhile
   let with_desc = map(mappings_by_source, 'FMLAddDescription(v:key, reverse(v:val))')
-  let vimrc_val = remove(with_desc, s:vimrc_glob)
-  let vimrc_first = [{ 'source': s:vimrc_glob, 'mappings': vimrc_val }]
+  if(exists("s:vimrc_glob"))
+    let vimrc_val = remove(with_desc, s:vimrc_glob)
+    let vimrc_first = [{ 'source': s:vimrc_glob, 'mappings': vimrc_val }]
+  else
+    let vimrc_first = []
+  endif
   let vimrc_first += values(map(with_desc, '{ "source": v:key, "mappings": v:val }'))
   return vimrc_first
 endfunction
@@ -58,7 +65,7 @@ function! FMLAddDescription(src, mappings)
   let lines_with_index = map(deepcopy(src_lines), '[v:key, v:val]') 
   let comments_by_id = {}
   for [idx, line] in lines_with_index
-    let lhs = matchlist(line, '\c\m^\(\a*\)map.*<leader>\(\S\+\)')
+    let lhs = matchlist(line, '\c\m^\(\a\?\)\a*map.*<leader>\(\S\+\)')
     if(!empty(lhs))
       let prev_line = src_lines[idx - 1]
       let comment = matchlist(prev_line, '^"\s*\(.*\)')
@@ -71,21 +78,24 @@ function! FMLAddDescription(src, mappings)
 endfunction
 
 function! FMLFormatMappings(source, mappings)
-  let formatted = map(a:mappings, 'printf("    %1s | %-5s | %s", v:val.mode, v:val.lhs, get(v:val, "desc", v:val.rhs))')
+  let mapping_width = FMLCalcMappingWidth(a:mappings)
+  let formatted = map(a:mappings, 'printf("    %1s | %-' . mapping_width . 's | %s", v:val.mode, v:val.lhs, get(v:val, "desc", v:val.rhs))')
   return a:source. "\n" . repeat('-', strchars(a:source)) . "\n\n" . join(formatted, "\n")
 endfunction
 
-function! FMLClose()
-  unlet s:fml_bufnr
-  bdelete
+function! FMLCalcMappingWidth(mappings)
+  let mapping_width = 1
+  for val in a:mappings
+    let mapping_width = max([mapping_width, strlen(val.lhs)])
+  endfor
+  return mapping_width
 endfunction
 
 function! FMLShow()
   let formattedMappings = join(map(FMLGetLeaderMappingsBySource(), 'FMLFormatMappings(v:val.source, v:val.mappings)'), "\n\n")
 
-  if(exists('s:fml_bufnr'))
+  if(exists('s:fml_bufnr') && bufwinnr(s:fml_bufnr) != -1)
     execute bufwinnr(s:fml_bufnr) . 'wincmd w'
-    execute 'normal ggdG'
   else
     new
     " Make it an unlisted scratch buffer
@@ -94,15 +104,18 @@ function! FMLShow()
     setlocal noswapfile
     setlocal nobuflisted
 
-    nnoremap <buffer> <silent> q :call FMLClose()<cr>
+    nnoremap <buffer> <silent> q :bdelete<cr>
+    silent file [Follow My Lead]
     let s:fml_bufnr = bufnr('%')
   endif
 
+  normal! ggdG
   put =formattedMappings
   normal! gg
 
 endfunction
 
-" Open Leader mappings in new window
-nnoremap <Leader>fml :call FMLShow()<CR>
+nnoremap <silent> <Plug>(FollowMyLead) :call FMLShow()<CR>
 
+" Open Leader mappings in new window
+nmap <Leader>fml <Plug>(FollowMyLead)
